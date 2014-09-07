@@ -19,92 +19,93 @@ int main(){
     
     /*go on forever or ctrl-C*/
     while(1){
-	char command[MAXBUF];
-	char *optionVector[MAXBUF], *optionPtr, *outputRedirectionVector[MAXBUF], redirectionCount=0;
-	int optionCount = 0, status, redirectStatus=0;
-	pid_t pid;
-	/*print prompt*/
-	printPrompt();
-	
-	/*get command from user*/
-	acceptCommand(command, *outputRedirectionVector, *optionVector);
-	
-	printf("command: %s", command);	
-	/* if command is exit quit program */
-	if(!strcmp("exit", command)){ 
-	    exit(0);
-	}
-	/*tokenize command*/	
-	optionPtr = strtok(command, " ");
-	*optionVector = optionPtr;
-	optionCount++;
-	while(optionPtr){
-	    
-	    optionPtr = strtok(NULL, " ");
-	    /* TODO
-	     * input redirect
-	     */
-	    /*
-	     * check if > is present
-	     */
-	    if(optionPtr[0] == 62){
-		outputRedirectionVector[redirectionCount++] = optionPtr;
-	    }else{ 
-		optionVector[optionCount++]= optionPtr;
-	    }
-	}
-	optionVector[optionCount]= NULL;
-	outputRedirectionVector[redirectionCount] = NULL;
+        char command[MAXBUF];
+        char *optionVector[MAXBUF], *optionPtr, *outputRedirectionVector[MAXBUF];
+        int optionCount = 0, status, redirectionCount=0;
+        /*int redirectStatus=0;*/ 
+        pid_t pid;
 
-	printOptions(optionVector, outputRedirectionVector);
-	/*check if fork is necessary*/
-	printf("Checking if fork is necessary...\n");
-	/*fork not necessary*/
-	if(!strcmp(optionVector[0], "cd")){
-	    /*if cd has no argument land on home*/
-	    if(!optionVector[1]){
-		chdir(HOME);
-		strcpy(cwd,HOME);
-	    }else{
-		/*check if its absolute path*/
-		if(optionVector[1][0]=='/'){
-		    chdir(optionVector[1]);
-		    strcpy(cwd, optionVector[1]);
-		}else{
-		    /*add absolute of current directory*/  
-		    char temp_address[200];
-		    strcpy(temp_address, cwd);
-		    strcat(temp_address, optionVector[1]);
-		    status = chdir(temp_address);
-		    perror("This is weird\n");
-		    if(status == -1){
-			printf("cd: %s No such directory found\n", optionVector[1]);
-		    }
-		    strcpy(cwd, optionVector[1]);
-		}
-	    }
-	}else if(!strcmp(optionVector[0], "pwd")){
-	    getcwd(cwd, MAXBUF);
-	    perror("This is weird\n");
-	    printf("%s\n", cwd);    
-	}else{
-	/* fork is necessary */
-	    pid = fork(); 
-	    printf("forking process...\n"); 
-	    /*check pid and exec*/
-	    if(pid == 0){
-		/*this is the child process*/
-		/*check if output redirection is necessary*/
-		printf("Checking if redirection is necessary...\n");
-		if(*outputRedirectionVector){
-		    printf("Redirecting output...\n");
-		}
-		execvp(optionVector[0], optionVector);
-		perror("Error!");
-	    }
-	    /*wait till child exits*/
-	    pid = wait(&status);
-	}
+        /*print prompt*/
+        printPrompt();
+        
+        /*get command from user*/
+        acceptCommand(command, *outputRedirectionVector, *optionVector);
+
+        printf("command: %s", command);	
+        /* if command is exit quit program */
+        if(!strcmp("exit", command)){ 
+            exit(0);
+        }
+        /*tokenize command*/	
+        optionPtr = strtok(command, " ");
+        *optionVector = optionPtr;
+        optionCount++;
+        while(optionPtr){
+            
+            optionPtr = strtok(NULL, " ");
+            /* TODO
+             * input redirect
+             */
+            
+             /* check if > is present*/
+            if(optionPtr && *optionPtr == '>'){
+                outputRedirectionVector[redirectionCount++] = optionPtr+1;
+            }else{ 
+                optionVector[optionCount++]= optionPtr;
+            }
+        }
+        optionVector[optionCount]= NULL;
+        outputRedirectionVector[redirectionCount] = NULL;
+
+        printOptions(optionVector, outputRedirectionVector);
+        /*check if fork is necessary*/
+        printf("Checking if fork is necessary...\n");
+        /*fork not necessary*/
+        if(!strcmp(optionVector[0], "cd")){
+            /*if cd has no argument land on home*/
+            if(!optionVector[1]){
+            chdir(HOME);
+            strcpy(cwd,HOME);
+            }else{
+            /*check if its absolute path*/
+            if(optionVector[1][0]=='/'){
+                chdir(optionVector[1]);
+                strcpy(cwd, optionVector[1]);
+            }else{
+                /*add absolute of current directory*/  
+                char temp_address[200];
+                strcpy(temp_address, cwd);
+                strcat(temp_address, optionVector[1]);
+                status = chdir(temp_address);
+                perror("This is weird\n");
+                if(status == -1){
+                printf("cd: %s No such directory found\n", optionVector[1]);
+                }
+                strcpy(cwd, optionVector[1]);
+            }
+            }
+        }else if(!strcmp(optionVector[0], "pwd")){
+            getcwd(cwd, MAXBUF);
+            perror("This is weird\n");
+            printf("%s\n", cwd);    
+        }else{
+        /* fork is necessary */
+            pid = fork(); 
+            printf("forking process...\n"); 
+            /*check pid and exec*/
+            if(pid == 0){
+                /*this is the child process*/
+                /*check if output redirection is necessary*/
+                printf("Checking if redirection is necessary...\n");
+                if(*outputRedirectionVector){
+                    printf("Redirecting output...\n");
+                }
+                execvp(optionVector[0], optionVector);
+                perror("Error!");
+            }
+            /*wait till child exits*/
+            pid = wait(&status);
+        }
     }
     return 0;
 }
@@ -118,25 +119,27 @@ void acceptCommand(char *commandPtr, char* optionVector, char *outputRedirection
     /*clean buffers*/
     int i;
     for(i=0;i<MAXBUF;i++){
-	commandPtr[i] = '\0';
-	optionVector = NULL;
-	outputRedirectionVector = NULL;
-
+        commandPtr[i] = '\0';
+        optionVector = NULL;
+        outputRedirectionVector = NULL;
     }
     while(c=getchar(), c!='\n'){
-	*commandPtr++ = c;
+        *commandPtr++ = c;
     }
     commandPtr = '\0';
-
 }
 
 void printOptions(char *optionVector[MAXBUF], char* outputRedirectionVector[MAXBUF]){
+    printf("\n--------------------------\n");
     printf("printing tokens: ");
     while(*optionVector){
-	printf("%s;", *optionVector++);
+        printf("%s;", *optionVector++);
     }
+    printf("\n");
     printf("\nprinting redirection tokens: ");
     while(*outputRedirectionVector){
-	printf("%s;", *outputRedirectionVector++);
+        printf("%s;", *outputRedirectionVector++);
     }
+    printf("\n");
+    printf("--------------------------\n");
 }

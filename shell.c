@@ -3,10 +3,14 @@
 #include<stdlib.h>
 #include<unistd.h>
 #include<sys/types.h>
+#include<sys/stat.h>
 #include<sys/wait.h>
 #include<fcntl.h>
 
 #define MAXBUF 100
+#define STDIN 0
+#define STDOUT 1
+#define STDERR 2
 
 void printPrompt();
 void acceptCommand(char*, char*, char*);
@@ -20,18 +24,17 @@ int main(){
     /*go on forever or ctrl-C*/
     while(1){
         char command[MAXBUF];
-        char *optionVector[MAXBUF], *optionPtr, *outputRedirectionVector[MAXBUF];
-        int optionCount = 0, status, redirectionCount=0;
-        /*int redirectStatus=0;*/ 
+        char *optionVector[MAXBUF], *optionPtr, 
+             *outputRedirectionVector[MAXBUF], *inputRedirectionVector[MAXBUF];
+        int optionCount = 0, status, outputRedirectionCount=0, inputRedirectionCount = 0;
         pid_t pid;
-
+        int fdout, fdin;
         /*print prompt*/
         printPrompt();
         
         /*get command from user*/
         acceptCommand(command, *outputRedirectionVector, *optionVector);
 
-        printf("command: %s", command);	
         /* if command is exit quit program */
         if(!strcmp("exit", command)){ 
             exit(0);
@@ -47,15 +50,19 @@ int main(){
              * input redirect
              */
             
-             /* check if > is present*/
-            if(optionPtr && *optionPtr == '>'){
-                outputRedirectionVector[redirectionCount++] = optionPtr+1;
-            }else{ 
-                optionVector[optionCount++]= optionPtr;
+             /* check if > or < is present*/
+            if(optionPtr){
+                if(*optionPtr == '>'){
+                    outputRedirectionVector[outputRedirectionCount++] = optionPtr + 1;
+                }else if(*optionPtr == '<'){
+                    inputRedirectionVector[inputRedirectionCount++] = optionPtr + 1;
+                }else{ 
+                    optionVector[optionCount++]= optionPtr;
+                }
             }
         }
         optionVector[optionCount]= NULL;
-        outputRedirectionVector[redirectionCount] = NULL;
+        outputRedirectionVector[outputRedirectionCount] = NULL;
 
         printOptions(optionVector, outputRedirectionVector);
         /*check if fork is necessary*/
@@ -99,6 +106,16 @@ int main(){
                 printf("Checking if redirection is necessary...\n");
                 if(*outputRedirectionVector){
                     printf("Redirecting output...\n");
+                    printf("Opening file %s...", *outputRedirectionVector);
+                    fdout = open(*outputRedirectionVector, O_WRONLY| O_CREAT | O_TRUNC);
+                    dup2(fdout, STDOUT);
+                }
+                
+                if(*inputRedirectionVector){
+                    printf("Redirecting input...\n");
+                    printf("Opening file %s", *inputRedirectionVector);
+                    fdin = open(*outputRedirectionVector, O_RDONLY | O_CREAT);
+                    dup2(fdin, STDIN);
                 }
                 execvp(optionVector[0], optionVector);
                 perror("Error!");
@@ -106,7 +123,7 @@ int main(){
             /*wait till child exits*/
             pid = wait(&status);
         }
-    }
+    }/*looping till infinity*/
     return 0;
 }
 
